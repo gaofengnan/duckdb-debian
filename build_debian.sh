@@ -46,15 +46,26 @@ build_architecture() {
     # Clean up any previous builds for this architecture
     rm -f "$duckdb_release" "${duckdb_release}.gz" || true
 
-    # Download and decompress the duckdb CLI binary for this architecture
-    if ! wget -q "https://github.com/duckdb/duckdb/releases/download/v${duckdb_VERSION}/${duckdb_release}.gz"; then
-        echo "❌ Failed to download duckdb CLI for $build_arch"
-        return 1
-    fi
-
-    if ! gunzip "${duckdb_release}.gz"; then
-        echo "❌ Failed to decompress duckdb CLI for $build_arch"
-        return 1
+    # Download the duckdb CLI binary for this architecture. From 2.0.0 upstream ships
+    # duckdb-cli-linux-<arch>.tar.gz (contains `duckdb`); earlier releases ship duckdb_cli-linux-<arch>.gz.
+    base="https://github.com/duckdb/duckdb/releases/download/v${duckdb_VERSION}"
+    new_name="${duckdb_release/duckdb_cli-/duckdb-cli-}"
+    rm -f duckdb "$new_name.tar.gz"
+    if wget -q "$base/$new_name.tar.gz"; then
+        if ! tar -xzf "$new_name.tar.gz" duckdb || ! mv duckdb "$duckdb_release"; then
+            echo "❌ Failed to unpack duckdb CLI for $build_arch"
+            return 1
+        fi
+        rm -f "$new_name.tar.gz"
+    else
+        if ! wget -q "$base/${duckdb_release}.gz"; then
+            echo "❌ Failed to download duckdb CLI for $build_arch"
+            return 1
+        fi
+        if ! gunzip "${duckdb_release}.gz"; then
+            echo "❌ Failed to decompress duckdb CLI for $build_arch"
+            return 1
+        fi
     fi
 
     # One package for every suite: upstream ships one binary per architecture,
